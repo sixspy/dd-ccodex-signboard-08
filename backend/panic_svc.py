@@ -7,7 +7,7 @@ from fastapi import APIRouter, Header, HTTPException
 from audit_svc import write_audit, write_history
 from auth import current_user, require_writer
 from db import connect, rows_to_list
-from locks import acquire, release
+from locks import acquire, mutex_key, release
 from validators import require_positive_int, require_title
 
 router = APIRouter(prefix="/api/panic", tags=["panic"])
@@ -52,7 +52,7 @@ def panic_official(body: dict, authorization: str | None = Header(default=None))
     require_writer(user)
     screen_id = require_positive_int(body.get("screen_id"), "屏幕编号")
     reason = require_title(body.get("reason") or "紧急撤屏", "原因")
-    lock_key = f"publish:{screen_id}"
+    lock_key = mutex_key(screen_id)
     acquire(lock_key, user["username"])
     try:
         with connect() as conn:
@@ -112,7 +112,7 @@ def promote_panic(shadow_id: int, authorization: str | None = Header(default=Non
             raise HTTPException(409, "影子不可升正")
         screen_id = sh["screen_id"]
         reason = sh["reason"]
-    lock_key = f"publish:{screen_id}"
+    lock_key = mutex_key(screen_id)
     acquire(lock_key, user["username"])
     try:
         with connect() as conn:

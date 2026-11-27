@@ -21,6 +21,14 @@ def evaluate_screen(body: dict, authorization: str | None = Header(default=None)
         screen = conn.execute("SELECT * FROM screens WHERE id=?", (screen_id,)).fetchone()
         if not screen:
             raise HTTPException(404, "屏幕不存在")
+        # 维保屏不得从任何来源出内容：覆盖与正式发布一律不生效，复机后才可上屏。
+        if screen["status"] == "maintenance":
+            return {
+                "source": "maintenance",
+                "play": None,
+                "now_hm": now_hm,
+                "reason": "屏幕维保中，禁止上屏",
+            }
         ov = conn.execute(
             "SELECT * FROM overrides WHERE screen_id=? AND official=1 AND active=1 ORDER BY id DESC LIMIT 1",
             (screen_id,),
